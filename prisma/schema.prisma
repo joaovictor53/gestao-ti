@@ -1,0 +1,104 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Nossos ENUMs para padronizar os status e roles
+enum Role {
+  USUARIO
+  TECNICO
+  ADMIN
+}
+
+enum StatusAtivo {
+  EM_USO
+  EM_ESTOQUE
+  EM_MANUTENCAO
+  DESCARTADO
+}
+
+enum StatusChamado {
+  ABERTO
+  EM_ATENDIMENTO
+  AGUARDANDO_RESPOSTA
+  FECHADO
+}
+
+enum PrioridadeChamado {
+  BAIXA
+  MEDIA
+  ALTA
+}
+
+// Nossas tabelas
+model Usuario {
+  id            Int      @id @default(autoincrement())
+  nomeCompleto  String
+  email         String   @unique
+  senhaHash     String
+  setor         String?
+  role          Role     @default(USUARIO)
+  dataCriacao   DateTime @default(now())
+  ativo         Boolean  @default(true)
+
+  // Relações
+  ativosResponsavel   Ativo[]
+  chamadosSolicitados Chamado[] @relation("Solicitante")
+  chamadosAtendidos   Chamado[] @relation("TecnicoResponsavel")
+  comentariosFeitos   Comentario[]
+}
+
+model Ativo {
+  id                 Int          @id @default(autoincrement())
+  nomeAtivo          String       @unique
+  tipoAtivo          String
+  numeroSerie        String?      @unique
+  patrimonio         String?      @unique
+  marca              String?
+  modelo             String?
+  status             StatusAtivo
+  localizacao        String?
+  dataAquisicao      DateTime?
+  idUsuarioResponsavel Int?
+
+  // Relações
+  usuarioResponsavel Usuario?  @relation(fields: [idUsuarioResponsavel], references: [id])
+  chamados           Chamado[] @relation("ChamadosAtivos")
+}
+
+model Chamado {
+  id                   Int               @id @default(autoincrement())
+  titulo               String
+  descricao            String?
+  status               StatusChamado     @default(ABERTO)
+  prioridade           PrioridadeChamado @default(MEDIA)
+  dataAbertura         DateTime          @default(now())
+  dataFechamento       DateTime?
+  idSolicitante        Int
+  idTecnicoResponsavel Int?
+
+  // Relações
+  solicitante          Usuario     @relation("Solicitante", fields: [idSolicitante], references: [id])
+  tecnicoResponsavel   Usuario?    @relation("TecnicoResponsavel", fields: [idTecnicoResponsavel], references: [id])
+  comentarios          Comentario[]
+  ativosRelacionados   Ativo[]     @relation("ChamadosAtivos")
+}
+
+model Comentario {
+  id             Int      @id @default(autoincrement())
+  texto          String
+  dataComentario DateTime @default(now())
+  ehInterno      Boolean  @default(false)
+  idChamado      Int
+  idAutor        Int
+
+  // Relações
+  chamado Chamado @relation(fields: [idChamado], references: [id], onDelete: Cascade)
+  autor   Usuario @relation(fields: [idAutor], references: [id])
+}
